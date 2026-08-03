@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智力拉鋸戰 - Intellectual Tug of War</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+    body { background: #1a1a2e; color: #fff; text-align: center; padding: 20px; }
+    h1 { margin-bottom: 4px; color: #f1c40f; font-size: 28px; }
+    .subtitle { color: #aaa; font-size: 14px; margin-bottom: 20px; }
+
+    /* ===== 中央拔河視覺區 (The Tug-of-War Field) ===== */
+    .arena {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 24px;
+      margin: 20px auto;
+      max-width: 680px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      border: 1px solid #0f3460;
+    }
+
+    /* 分數顯示板 */
+    .scoreboard {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 0 8px;
+    }
+    .team-block { text-align: center; flex: 1; }
+    .team-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #aaa;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
+    .team-score {
+      font-size: 48px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .red-score { color: #ff6b6b; }
+    .blue-score { color: #4dabf7; }
+    .vs-divider {
+      font-size: 13px;
+      color: #666;
+      font-weight: 600;
+      padding: 0 16px;
+      letter-spacing: 2px;
+    }
+
+    /* 拔河軌道 */
+    .tow-field {
+      position: relative;
+      height: 100px;
+      background: #0f3460;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      border: 1px solid #1a3a5c;
+    }
+    .field-zones {
+      position: absolute;
+      top: 8px; left: 0; right: 0;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 11px;
+      color: #557a95;
+      font-weight: 500;
+    }
+    .field-center { position: absolute; left: 50%; transform: translateX(-50%); }
+
+    /* 中線標記 */
+    .center-line {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 2px; height: 20px;
+      background: #557a95;
+      transform: translate(-50%, -50%);
+      border-radius: 1px;
+    }
+
+    /* 繩子 */
+    .rope-container {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+    }
+    .rope-track-line {
+      position: absolute;
+      top: 50%; left: 24px; right: 24px;
+      height: 3px;
+      background: #1a3a5c;
+      transform: translateY(-50%);
+      border-radius: 2px;
+    }
+    .rope {
+      position: absolute;
+      top: 50%; left: 24px; right: 24px;
+      height: 14px;
+      transform: translateY(-50%);
+      transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .rope-red-side {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        #ff6b6b 0px, #ff6b6b 5px,
+        #ff8787 5px, #ff8787 10px
+      );
+      border-radius: 7px 0 0 7px;
+      box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .rope-blue-side {
+      position: absolute; right: 0; top: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        #4dabf7 0px, #4dabf7 5px,
+        #74c0fc 5px, #74c0fc 10px
+      );
+      border-radius: 0 7px 7px 0;
+      box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    /* 中央旗幟標記 */
+    .rope-marker {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 32px; height: 40px;
+      transform: translate(-50%, -50%);
+      transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      z-index: 10;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+    }
+    .flag-pole {
+      position: absolute;
+      left: 50%; top: 0; bottom: 0;
+      width: 3px;
+      background: #f1c40f;
+      transform: translateX(-50%);
+      border-radius: 2px;
+    }
+    .flag-cloth {
+      position: absolute;
+      left: 50%; top: 2px;
+      width: 20px; height: 16px;
+      background: #ff6b6b;
+      clip-path: polygon(0 0, 100% 30%, 100% 70%, 0 100%);
+      transform-origin: left center;
+      animation: flagWave 0.5s ease-in-out infinite alternate;
+    }
+    @keyframes flagWave {
+      from { transform: scaleX(1) skewY(0deg); }
+      to { transform: scaleX(0.75) skewY(-3deg); }
+    }
+    .flag-knot {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 12px; height: 12px;
+      background: #f1c40f;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 11;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+
+    /* 勝利線 */
+    .win-line-red {
+      position: absolute;
+      left: 8%; top: 20%; bottom: 20%;
+      width: 2px;
+      background: repeating-linear-gradient(to bottom, #ff6b6b 0, #ff6b6b 4px, transparent 4px, transparent 8px);
+      opacity: 0.4;
+    }
+    .win-line-blue {
+      position: absolute;
+      right: 8%; top: 20%; bottom: 20%;
+      width: 2px;
+      background: repeating-linear-gradient(to bottom, #4dabf7 0, #4dabf7 4px, transparent 4px, transparent 8px);
+      opacity: 0.4;
+    }
+
+    /* 分差進度條 */
+    .diff-bar-wrap {
+      margin-top: 12px;
+    }
+    .diff-bar {
+      display: flex;
+      height: 6px;
+      border-radius: 3px;
+      overflow: hidden;
+      background: #0f3460;
+    }
+    .diff-red-fill {
+      background: #ff6b6b;
+      transition: width 0.4s ease-out;
+    }
+    .diff-blue-fill {
+      background: #4dabf7;
+      transition: width 0.4s ease-out;
+    }
+    .diff-legend {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 11px;
+      color: #557a95;
+    }
+
+    /* 狀態文字 */
+    .game-status {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #aaa;
+      min-height: 20px;
+    }
+    .game-status strong { color: #fff; }
+
+    /* 隊伍選擇 */
+    .team-select { margin: 24px 0; }
+    .team-select h3 { margin-bottom: 16px; color: #ddd; font-size: 16px; }
+    .btn-team {
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin: 0 10px;
+      color: #fff;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-team:hover { transform: translateY(-2px); }
+    .btn-team:active { transform: translateY(0); }
+    .btn-red { background: #ff6b6b; box-shadow: 0 4px 12px rgba(255,107,107,0.3); }
+    .btn-blue { background: #4dabf7; box-shadow: 0 4px 12px rgba(77,171,247,0.3); }
+
+    /* 開始按鈕 */
+    .btn-start {
+      background: #2ecc71;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      margin-top: 12px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(46,204,113,0.3);
+    }
+    .btn-start:hover { transform: translateY(-1px); opacity: 0.95; }
+
+    /* 答題卡 */
+    .quiz-card {
+      background: #0f3460;
+      border-radius: 16px;
+      padding: 28px;
+      margin: 20px auto;
+      max-width: 420px;
+      display: none;
+      border: 1px solid #1a3a5c;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .question {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      color: #e94560;
+      min-height: 40px;
+    }
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .btn-option {
+      background: #16213e;
+      color: #fff;
+      border: 2px solid #e94560;
+      padding: 16px;
+      font-size: 20px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-option:hover {
+      background: #e94560;
+      transform: translateY(-1px);
+    }
+    .btn-option:active { transform: translateY(0); }
+
+    .frozen { opacity: 0.3; pointer-events: none; filter: grayscale(0.5); }
+
+    /* 粒子特效 */
+    .particles-layer {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .particle {
+      position: absolute;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      opacity: 0;
+    }
+    @keyframes particleBurst {
+      0% { transform: translate(0,0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+    }
+  </style>
+<base target="_blank">
+</head>
+<body>
+
+  <h1>智力拉鋸戰</h1>
+  <p class="subtitle">Intellectual Tug-of-War</p>
+
+  <!-- ===== 中央拔河即時戰況 ===== -->
+  <div class="arena">
+    <div class="scoreboard">
+      <div class="team-block">
+        <div class="team-label">紅隊 RED</div>
+        <div class="team-score red-score" id="red-score">0</div>
+      </div>
+      <div class="vs-divider">VS</div>
+      <div class="team-block">
+        <div class="team-label">藍隊 BLUE</div>
+        <div class="team-score blue-score" id="blue-score">0</div>
+      </div>
+    </div>
+
+    <div class="tow-field" id="tow-field">
+      <div class="field-zones">
+        <span>紅隊陣地</span>
+        <span class="field-center">中線</span>
+        <span>藍隊陣地</span>
+      </div>
+      <div class="win-line-red"></div>
+      <div class="win-line-blue"></div>
+      <div class="center-line"></div>
+      <div class="rope-track-line"></div>
+      <div class="rope-container">
+        <div class="rope" id="rope">
+          <div class="rope-red-side" id="rope-red"></div>
+          <div class="rope-blue-side" id="rope-blue"></div>
+        </div>
+        <div class="rope-marker" id="rope-marker">
+          <div class="flag-pole"></div>
+          <div class="flag-cloth"></div>
+          <div class="flag-knot"></div>
+        </div>
+      </div>
+      <div class="particles-layer" id="particles"></div>
+    </div>
+
+    <div class="diff-bar-wrap">
+      <div class="diff-bar">
+        <div class="diff-red-fill" id="diff-red" style="width:50%"></div>
+        <div class="diff-blue-fill" id="diff-blue" style="width:50%"></div>
+      </div>
+      <div class="diff-legend">
+        <span>紅隊優勢</span>
+        <span>藍隊優勢</span>
+      </div>
+    </div>
+
+    <div class="game-status" id="game-status">等待遊戲開始...</div>
+
+    <button class="btn-start" onclick="startGame()">🎲 重新載入 AI 題目 (Dify)</button>
+  </div>
+
+  <!-- 玩家選擇隊伍區 -->
+  <div id="team-select-section" class="team-select">
+    <h3>請選擇你的隊伍：</h3>
+    <button class="btn-team btn-red" onclick="joinTeam('red')">加入紅隊</button>
+    <button class="btn-team btn-blue" onclick="joinTeam('blue')">加入藍隊</button>
+  </div>
+
+  <!-- 個人答題區 -->
+  <div id="quiz-card" class="quiz-card">
+    <div id="question" class="question">等待發題...</div>
+    <div id="options-grid" class="options-grid"></div>
+  </div>
+
+  <script>
+    const RENDER_BACKEND_URL = 'https://lohas-care-intellectual-tug-of-war.onrender.com';
+    const socket = io(RENDER_BACKEND_URL);
+
+    let currentTeam = null;
+    let questions = [];
+    let currentQuestionIndex = 0;
+    let questionStartTime = 0;
+
+    // DOM refs
+    const redScoreEl = document.getElementById('red-score');
+    const blueScoreEl = document.getElementById('blue-score');
+    const ropeMarker = document.getElementById('rope-marker');
+    const ropeRed = document.getElementById('rope-red');
+    const ropeBlue = document.getElementById('rope-blue');
+    const diffRed = document.getElementById('diff-red');
+    const diffBlue = document.getElementById('diff-blue');
+    const statusEl = document.getElementById('game-status');
+    const particlesLayer = document.getElementById('particles');
+
+    // 連線與狀態更新
+    socket.on('connect', () => {
+      console.log('連線至伺服器成功:', socket.id);
+    });
+
+    socket.on('game_update', (state) => {
+      updateArena(state.redScore, state.blueScore);
+    });
+
+    socket.on('game_init', (state) => {
+      questions = state.questions;
+      currentQuestionIndex = 0;
+      if (currentTeam) showNextQuestion();
+    });
+
+    socket.on('game_over', (data) => {
+      const winner = data.winner === 'red' ? '紅隊' : '藍隊';
+      statusEl.innerHTML = `<strong style="color:#f1c40f">🎉 遊戲結束！恭喜 ${winner} 獲得勝利！</strong>`;
+      confettiEffect(data.winner);
+    });
+
+    // 更新視覺區
+    function updateArena(redScore, blueScore) {
+      redScoreEl.textContent = redScore;
+      blueScoreEl.textContent = blueScore;
+
+      const diff = redScore - blueScore;
+      const total = redScore + blueScore || 1;
+      const maxDiff = Math.max(Math.abs(diff), 50);
+      const normalized = diff / maxDiff;
+      const position = 50 + normalized * 42;
+      const clamped = Math.max(5, Math.min(95, position));
+
+      ropeMarker.style.left = clamped + '%';
+      ropeRed.style.right = (100 - clamped) + '%';
+      ropeBlue.style.left = clamped + '%';
+
+      const redW = total > 0 ? (redScore / total) * 100 : 50;
+      diffRed.style.width = redW + '%';
+      diffBlue.style.width = (100 - redW) + '%';
+
+      if (diff > 20) statusEl.innerHTML = `<strong style="color:#ff6b6b">紅隊大幅領先！</strong> 繩子偏向紅隊陣地 ${diff} 分`;
+      else if (diff < -20) statusEl.innerHTML = `<strong style="color:#4dabf7">藍隊大幅領先！</strong> 繩子偏向藍隊陣地 ${Math.abs(diff)} 分`;
+      else if (diff > 0) statusEl.innerHTML = `紅隊領先 ${diff} 分，繩子略偏紅隊`;
+      else if (diff < 0) statusEl.innerHTML = `藍隊領先 ${Math.abs(diff)} 分，繩子略偏藍隊`;
+      else statusEl.innerHTML = `雙方勢均力敵，繩子在中線`;
+    }
+
+    // 得分粒子特效
+    function spawnParticles(team) {
+      const color = team === 'red' ? '#ff6b6b' : '#4dabf7';
+      const centerX = team === 'red' ? 20 : 80;
+      for (let i = 0; i < 10; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.background = color;
+        p.style.left = centerX + '%';
+        p.style.top = '50%';
+        const angle = (Math.random() * 140 - 70) * (Math.PI / 180);
+        const dist = 30 + Math.random() * 50;
+        p.style.setProperty('--tx', Math.sin(angle) * dist + 'px');
+        p.style.setProperty('--ty', Math.cos(angle) * dist + 'px');
+        p.style.animation = 'particleBurst 0.7s ease-out forwards';
+        particlesLayer.appendChild(p);
+        setTimeout(() => p.remove(), 700);
+      }
+    }
+
+    // 勝利彩紙特效
+    function confettiEffect(winner) {
+      const color = winner === 'red' ? '#ff6b6b' : '#4dabf7';
+      for (let i = 0; i < 30; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.background = color;
+        p.style.left = '50%';
+        p.style.top = '50%';
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 40 + Math.random() * 80;
+        p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+        p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+        p.style.animation = 'particleBurst 1s ease-out forwards';
+        p.style.width = '6px'; p.style.height = '6px';
+        particlesLayer.appendChild(p);
+        setTimeout(() => p.remove(), 1000);
+      }
+    }
+
+    // 加入隊伍
+    function joinTeam(team) {
+      currentTeam = team;
+      socket.emit('join_team', team);
+      document.getElementById('team-select-section').style.display = 'none';
+      document.getElementById('quiz-card').style.display = 'block';
+      if (questions.length > 0) showNextQuestion();
+    }
+
+    // 手動叫用後端 API
+    function startGame() {
+      fetch(`${RENDER_BACKEND_URL}/api/start-game?difficulty=easy&count=10`)
+        .then(res => res.json())
+        .then(data => console.log('遊戲已重置:', data));
+    }
+
+    // 顯示下一題
+    function showNextQuestion() {
+      if (currentQuestionIndex >= questions.length) {
+        document.getElementById('question').innerText = "題目已答完！等待下一局...";
+        document.getElementById('options-grid').innerHTML = "";
+        return;
+      }
+      const q = questions[currentQuestionIndex];
+      document.getElementById('question').innerText = q.question;
+      questionStartTime = Date.now();
+
+      const optionsGrid = document.getElementById('options-grid');
+      optionsGrid.innerHTML = '';
+      q.options.forEach(option => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-option';
+        btn.innerText = option;
+        btn.onclick = () => submitAnswer(option, q.answer);
+        optionsGrid.appendChild(btn);
+      });
+    }
+
+    // 提交答案
+    function submitAnswer(selected, correct) {
+      const isCorrect = (selected === correct);
+      const responseTimeSec = (Date.now() - questionStartTime) / 1000;
+      socket.emit('submit_answer', { isCorrect, responseTimeSec });
+
+      if (isCorrect) {
+        spawnParticles(currentTeam);
+        currentQuestionIndex++;
+        showNextQuestion();
+      } else {
+        const quizCard = document.getElementById('quiz-card');
+        quizCard.classList.add('frozen');
+        setTimeout(() => quizCard.classList.remove('frozen'), 1500);
+      }
+    }
+  </script>
+</body>
+</html>
