@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>智力拉鋸戰 - Intellectual Tug of War</title>
+  <!-- 引入 Socket.io Client -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
@@ -106,7 +107,6 @@
       top: 50%; left: 24px; right: 24px;
       height: 14px;
       transform: translateY(-50%);
-      transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
     .rope-red-side {
       position: absolute; left: 0; top: 0; bottom: 0;
@@ -117,6 +117,7 @@
       );
       border-radius: 7px 0 0 7px;
       box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.3);
+      transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
     .rope-blue-side {
       position: absolute; right: 0; top: 0; bottom: 0;
@@ -127,6 +128,7 @@
       );
       border-radius: 0 7px 7px 0;
       box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.3);
+      transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     /* 中央旗幟標記 */
@@ -318,7 +320,6 @@
       100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
     }
   </style>
-<base target="_blank">
 </head>
 <body>
 
@@ -351,10 +352,10 @@
       <div class="rope-track-line"></div>
       <div class="rope-container">
         <div class="rope" id="rope">
-          <div class="rope-red-side" id="rope-red"></div>
-          <div class="rope-blue-side" id="rope-blue"></div>
+          <div class="rope-red-side" id="rope-red" style="right: 50%;"></div>
+          <div class="rope-blue-side" id="rope-blue" style="left: 50%;"></div>
         </div>
-        <div class="rope-marker" id="rope-marker">
+        <div class="rope-marker" id="rope-marker" style="left: 50%;">
           <div class="flag-pole"></div>
           <div class="flag-cloth"></div>
           <div class="flag-knot"></div>
@@ -424,6 +425,7 @@
     socket.on('game_init', (state) => {
       questions = state.questions;
       currentQuestionIndex = 0;
+      updateArena(state.redScore, state.blueScore);
       if (currentTeam) showNextQuestion();
     });
 
@@ -509,7 +511,7 @@
       if (questions.length > 0) showNextQuestion();
     }
 
-    // 手動叫用後端 API
+    // 手動叫用後端 API 重置/發題目
     function startGame() {
       fetch(`${RENDER_BACKEND_URL}/api/start-game?difficulty=easy&count=10`)
         .then(res => res.json())
