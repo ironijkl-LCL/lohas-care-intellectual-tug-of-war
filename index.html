@@ -3,394 +3,257 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智力拉鋸戰 - Intellectual Tug of War</title>
-  <!-- 引入 Socket.io Client -->
+  <title>智力拉鋸戰 - Arcade Tug of War</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+  
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
-    body { background: #1a1a2e; color: #fff; text-align: center; padding: 20px; }
-    h1 { margin-bottom: 4px; color: #f1c40f; font-size: 28px; }
-    .subtitle { color: #aaa; font-size: 14px; margin-bottom: 20px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Sans TC', sans-serif; }
+    
+    body {
+      background: radial-gradient(circle at 50% 20%, #1a1c38 0%, #0d0e1e 60%, #05050d 100%);
+      color: #fff; text-align: center; padding: 20px 12px; min-height: 100vh; overflow-x: hidden; position: relative;
+    }
 
-    /* ===== 中央拔河視覺區 (The Tug-of-War Field) ===== */
+    body::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 30px 30px; pointer-events: none; z-index: 0;
+    }
+
+    .container { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; }
+
+    h1 {
+      font-family: 'Orbitron', 'Noto Sans TC', sans-serif; font-size: 34px; font-weight: 900;
+      background: linear-gradient(180deg, #fff 20%, #f1c40f 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(241, 196, 15, 0.4); letter-spacing: 2px;
+    }
+    .subtitle {
+      font-family: 'Orbitron', sans-serif; color: #00d2ff; font-size: 12px; letter-spacing: 4px;
+      text-transform: uppercase; margin-bottom: 16px; text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);
+    }
+
+    /* 競技場 */
     .arena {
-      background: #16213e;
-      border-radius: 16px;
-      padding: 24px;
-      margin: 20px auto;
-      max-width: 680px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      border: 1px solid #0f3460;
+      background: rgba(22, 27, 46, 0.85); backdrop-filter: blur(16px); border-radius: 24px;
+      padding: 20px; margin-bottom: 20px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08); position: relative;
     }
 
-    /* 分數顯示板 */
+    /* 震動效果 */
+    .shake { animation: arenaShake 0.25s cubic-bezier(.36,.07,.19,.97) both; }
+    @keyframes arenaShake {
+      10%, 90% { transform: translate3d(-2px, 0, 0); }
+      20%, 80% { transform: translate3d(3px, -2px, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 2px, 0); }
+      40%, 60% { transform: translate3d(4px, 0, 0); }
+    }
+
+    /* 計分板 */
     .scoreboard {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      padding: 0 8px;
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+      background: rgba(10, 14, 26, 0.7); padding: 12px 24px; border-radius: 16px;
     }
-    .team-block { text-align: center; flex: 1; }
-    .team-label {
-      font-size: 13px;
-      font-weight: 500;
-      color: #aaa;
-      margin-bottom: 6px;
-      letter-spacing: 1px;
-    }
-    .team-score {
-      font-size: 48px;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      line-height: 1;
-      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .red-score { color: #ff6b6b; }
-    .blue-score { color: #4dabf7; }
-    .vs-divider {
-      font-size: 13px;
-      color: #666;
-      font-weight: 600;
-      padding: 0 16px;
-      letter-spacing: 2px;
+    .team-label { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
+    .red-label { color: #ff4757; text-shadow: 0 0 10px rgba(255, 71, 87, 0.6); }
+    .blue-label { color: #2ed573; text-shadow: 0 0 10px rgba(46, 213, 115, 0.6); }
+    .team-score { font-family: 'Orbitron', sans-serif; font-size: 46px; font-weight: 900; line-height: 1; }
+    .red-score { color: #ff6b81; } .blue-score { color: #7bed9f; }
+
+    /* ===== 動態拔河大舞台 ===== */
+    .tow-stage {
+      position: relative; height: 160px; background: #090c15; border-radius: 20px;
+      overflow: hidden; border: 2px solid #1e2746; box-shadow: inset 0 0 25px rgba(0,0,0,0.9);
+      display: flex; align-items: center; justify-content: center;
     }
 
-    /* 拔河軌道 */
-    .tow-field {
-      position: relative;
-      height: 100px;
-      background: #0f3460;
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 16px;
-      border: 1px solid #1a3a5c;
+    /* 舞台地面網格 */
+    .stage-floor {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 45px;
+      background: linear-gradient(180deg, #141b2d 0%, #080a14 100%);
+      border-top: 2px solid #2f3640;
     }
-    .field-zones {
-      position: absolute;
-      top: 8px; left: 0; right: 0;
-      display: flex;
-      justify-content: space-between;
-      padding: 0 16px;
-      font-size: 11px;
-      color: #557a95;
-      font-weight: 500;
-    }
-    .field-center { position: absolute; left: 50%; transform: translateX(-50%); }
 
-    /* 中線標記 */
-    .center-line {
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 2px; height: 20px;
-      background: #557a95;
-      transform: translate(-50%, -50%);
-      border-radius: 1px;
+    /* 主動態組件：隨比分平移 */
+    .rope-assembly {
+      position: absolute; top: 0; bottom: 0; width: 600px;
+      left: 50%; transform: translateX(-50%); transition: left 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.25);
+      display: flex; align-items: center; justify-content: center;
     }
 
     /* 繩子 */
-    .rope-container {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      pointer-events: none;
-    }
-    .rope-track-line {
-      position: absolute;
-      top: 50%; left: 24px; right: 24px;
-      height: 3px;
-      background: #1a3a5c;
-      transform: translateY(-50%);
-      border-radius: 2px;
-    }
-    .rope {
-      position: absolute;
-      top: 50%; left: 24px; right: 24px;
-      height: 14px;
-      transform: translateY(-50%);
-    }
-    .rope-red-side {
-      position: absolute; left: 0; top: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        45deg,
-        #ff6b6b 0px, #ff6b6b 5px,
-        #ff8787 5px, #ff8787 10px
-      );
-      border-radius: 7px 0 0 7px;
-      box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.3);
-      transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    }
-    .rope-blue-side {
-      position: absolute; right: 0; top: 0; bottom: 0;
-      background: repeating-linear-gradient(
-        -45deg,
-        #4dabf7 0px, #4dabf7 5px,
-        #74c0fc 5px, #74c0fc 10px
-      );
-      border-radius: 0 7px 7px 0;
-      box-shadow: inset 0 1px 2px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.3);
-      transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    .rope-line {
+      position: absolute; top: 62%; left: 80px; right: 80px; height: 14px;
+      background: repeating-linear-gradient(45deg, #d2dae2, #d2dae2 8px, #808e9b 8px, #808e9b 16px);
+      border-radius: 7px; box-shadow: 0 4px 8px rgba(0,0,0,0.6), inset 0 2px 2px rgba(255,255,255,0.6);
+      z-index: 2;
     }
 
-    /* 中央旗幟標記 */
-    .rope-marker {
-      position: absolute;
-      top: 50%; left: 50%;
-      width: 32px; height: 40px;
-      transform: translate(-50%, -50%);
-      transition: left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      z-index: 10;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+    /* 中央紅旗標記 */
+    .center-flag {
+      position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 4;
+      display: flex; flex-direction: column; align-items: center;
     }
-    .flag-pole {
-      position: absolute;
-      left: 50%; top: 0; bottom: 0;
-      width: 3px;
-      background: #f1c40f;
-      transform: translateX(-50%);
-      border-radius: 2px;
+    .flag-banner {
+      width: 24px; height: 28px; background: #e74c3c;
+      clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
+      box-shadow: 0 0 12px #e74c3c; animation: pulseFlag 0.8s infinite alternate;
     }
-    .flag-cloth {
-      position: absolute;
-      left: 50%; top: 2px;
-      width: 20px; height: 16px;
-      background: #ff6b6b;
-      clip-path: polygon(0 0, 100% 30%, 100% 70%, 0 100%);
-      transform-origin: left center;
-      animation: flagWave 0.5s ease-in-out infinite alternate;
+    @keyframes pulseFlag { from { transform: scale(1); } to { transform: scale(1.15); } }
+    .flag-ring { width: 14px; height: 14px; background: #f1c40f; border-radius: 50%; border: 2px solid #fff; margin-top: -4px; }
+
+    /* ===== 公仔團隊區 ===== */
+    .team-sprites {
+      position: absolute; top: 25px; display: flex; gap: 8px; z-index: 3;
     }
-    @keyframes flagWave {
-      from { transform: scaleX(1) skewY(0deg); }
-      to { transform: scaleX(0.75) skewY(-3deg); }
+    .sprites-red { right: 52%; flex-direction: row-reverse; }
+    .sprites-blue { left: 52%; flex-direction: row; }
+
+    /* 公仔人仔樣式 (SVG 向量人物) */
+    .character {
+      width: 46px; height: 65px; position: relative;
+      transition: transform 0.15s ease;
     }
-    .flag-knot {
-      position: absolute;
-      left: 50%; top: 50%;
-      width: 12px; height: 12px;
-      background: #f1c40f;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 11;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    
+    /* 拔河拉扯動畫 */
+    .pulling-red { animation: pullBackRed 0.4s infinite alternate ease-in-out; }
+    .pulling-blue { animation: pullBackBlue 0.4s infinite alternate ease-in-out; }
+    @keyframes pullBackRed {
+      from { transform: rotate(-8deg) translateX(0); }
+      to { transform: rotate(-18deg) translateX(-4px); }
+    }
+    @keyframes pullBackBlue {
+      from { transform: rotate(8deg) translateX(0); }
+      to { transform: rotate(18deg) translateX(4px); }
     }
 
-    /* 勝利線 */
-    .win-line-red {
-      position: absolute;
-      left: 8%; top: 20%; bottom: 20%;
-      width: 2px;
-      background: repeating-linear-gradient(to bottom, #ff6b6b 0, #ff6b6b 4px, transparent 4px, transparent 8px);
-      opacity: 0.4;
+    /* 浮動傷害/得分數字 (Floating Text) */
+    .float-text {
+      position: absolute; font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 900;
+      pointer-events: none; z-index: 20; animation: floatUp 0.8s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
     }
-    .win-line-blue {
-      position: absolute;
-      right: 8%; top: 20%; bottom: 20%;
-      width: 2px;
-      background: repeating-linear-gradient(to bottom, #4dabf7 0, #4dabf7 4px, transparent 4px, transparent 8px);
-      opacity: 0.4;
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, 0) scale(0.6); }
+      50% { transform: translate(-50%, -30px) scale(1.2); }
+      100% { opacity: 0; transform: translate(-50%, -50px) scale(1); }
     }
 
-    /* 分差進度條 */
-    .diff-bar-wrap {
-      margin-top: 12px;
-    }
-    .diff-bar {
-      display: flex;
-      height: 6px;
-      border-radius: 3px;
-      overflow: hidden;
-      background: #0f3460;
-    }
-    .diff-red-fill {
-      background: #ff6b6b;
-      transition: width 0.4s ease-out;
-    }
-    .diff-blue-fill {
-      background: #4dabf7;
-      transition: width 0.4s ease-out;
-    }
-    .diff-legend {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 6px;
-      font-size: 11px;
-      color: #557a95;
-    }
+    /* 分差條 */
+    .diff-bar-wrap { margin-top: 14px; }
+    .diff-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #090c15; }
+    .diff-red-fill { background: linear-gradient(90deg, #ff4757, #ff6b81); transition: width 0.3s; }
+    .diff-blue-fill { background: linear-gradient(90deg, #7bed9f, #2ed573); transition: width 0.3s; }
 
-    /* 狀態文字 */
-    .game-status {
-      margin-top: 12px;
-      font-size: 14px;
-      color: #aaa;
-      min-height: 20px;
-    }
-    .game-status strong { color: #fff; }
+    .game-status { margin-top: 12px; font-size: 14px; font-weight: 700; color: #a4b0be; min-height: 20px; }
 
-    /* 隊伍選擇 */
-    .team-select { margin: 24px 0; }
-    .team-select h3 { margin-bottom: 16px; color: #ddd; font-size: 16px; }
-    .btn-team {
-      padding: 14px 32px;
-      font-size: 16px;
-      font-weight: 600;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      margin: 0 10px;
-      color: #fff;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .btn-team:hover { transform: translateY(-2px); }
-    .btn-team:active { transform: translateY(0); }
-    .btn-red { background: #ff6b6b; box-shadow: 0 4px 12px rgba(255,107,107,0.3); }
-    .btn-blue { background: #4dabf7; box-shadow: 0 4px 12px rgba(77,171,247,0.3); }
-
-    /* 開始按鈕 */
     .btn-start {
-      background: #2ecc71;
-      color: #fff;
-      padding: 12px 24px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-size: 15px;
-      font-weight: 600;
-      margin-top: 12px;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(46,204,113,0.3);
+      background: linear-gradient(135deg, #00b894, #00cec9); color: #fff; padding: 12px 24px;
+      border-radius: 12px; border: none; cursor: pointer; font-size: 14px; font-weight: 700;
+      margin-top: 12px; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0, 206, 201, 0.4);
     }
-    .btn-start:hover { transform: translateY(-1px); opacity: 0.95; }
+
+    /* 陣營選擇 */
+    .team-select { margin: 24px 0; }
+    .btn-team {
+      padding: 16px 36px; font-size: 17px; font-weight: 900; border: none; border-radius: 16px;
+      cursor: pointer; margin: 0 10px; color: #fff; transition: all 0.2s;
+    }
+    .btn-red { background: linear-gradient(135deg, #ff4757, #ff6b81); box-shadow: 0 6px 20px rgba(255, 71, 87, 0.4); }
+    .btn-blue { background: linear-gradient(135deg, #2ed573, #10ac84); box-shadow: 0 6px 20px rgba(46, 213, 115, 0.4); }
 
     /* 答題卡 */
     .quiz-card {
-      background: #0f3460;
-      border-radius: 16px;
-      padding: 28px;
-      margin: 20px auto;
-      max-width: 420px;
-      display: none;
-      border: 1px solid #1a3a5c;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      background: rgba(15, 20, 35, 0.9); backdrop-filter: blur(20px); border-radius: 20px;
+      padding: 24px 20px; margin: 16px auto; max-width: 440px; display: none;
+      border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
     }
-    .question {
-      font-size: 32px;
-      font-weight: 700;
-      margin-bottom: 24px;
-      color: #e94560;
-      min-height: 40px;
-    }
-    .options-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
+    .question { font-family: 'Orbitron', 'Noto Sans TC', sans-serif; font-size: 36px; font-weight: 900; margin-bottom: 20px; color: #00d2ff; }
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .btn-option {
-      background: #16213e;
-      color: #fff;
-      border: 2px solid #e94560;
-      padding: 16px;
-      font-size: 20px;
-      font-weight: 600;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      background: rgba(255, 255, 255, 0.05); color: #fff; border: 2px solid rgba(0, 210, 255, 0.3);
+      padding: 18px 10px; font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 700;
+      border-radius: 14px; cursor: pointer; transition: all 0.15s;
     }
-    .btn-option:hover {
-      background: #e94560;
-      transform: translateY(-1px);
-    }
-    .btn-option:active { transform: translateY(0); }
-
-    .frozen { opacity: 0.3; pointer-events: none; filter: grayscale(0.5); }
-
-    /* 粒子特效 */
-    .particles-layer {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      pointer-events: none;
-      overflow: hidden;
-    }
-    .particle {
-      position: absolute;
-      width: 5px; height: 5px;
-      border-radius: 50%;
-      opacity: 0;
-    }
-    @keyframes particleBurst {
-      0% { transform: translate(0,0) scale(1); opacity: 1; }
-      100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
-    }
+    .btn-option:hover { background: rgba(0, 210, 255, 0.25); border-color: #00d2ff; }
+    .frozen { opacity: 0.3; pointer-events: none; }
   </style>
 </head>
 <body>
 
-  <h1>智力拉鋸戰</h1>
-  <p class="subtitle">Intellectual Tug-of-War</p>
+  <div class="container">
+    <h1>智力拉鋸戰</h1>
+    <p class="subtitle">Arcade Tug-of-War Showdown</p>
 
-  <!-- ===== 中央拔河即時戰況 ===== -->
-  <div class="arena">
-    <div class="scoreboard">
-      <div class="team-block">
-        <div class="team-label">紅隊 RED</div>
-        <div class="team-score red-score" id="red-score">0</div>
-      </div>
-      <div class="vs-divider">VS</div>
-      <div class="team-block">
-        <div class="team-label">藍隊 BLUE</div>
-        <div class="team-score blue-score" id="blue-score">0</div>
-      </div>
-    </div>
-
-    <div class="tow-field" id="tow-field">
-      <div class="field-zones">
-        <span>紅隊陣地</span>
-        <span class="field-center">中線</span>
-        <span>藍隊陣地</span>
-      </div>
-      <div class="win-line-red"></div>
-      <div class="win-line-blue"></div>
-      <div class="center-line"></div>
-      <div class="rope-track-line"></div>
-      <div class="rope-container">
-        <div class="rope" id="rope">
-          <div class="rope-red-side" id="rope-red" style="right: 50%;"></div>
-          <div class="rope-blue-side" id="rope-blue" style="left: 50%;"></div>
+    <!-- ===== 中央拔河競技場 ===== -->
+    <div class="arena" id="arena-box">
+      <div class="scoreboard">
+        <div>
+          <div class="team-label red-label">紅隊 RED</div>
+          <div class="team-score red-score" id="red-score">0</div>
         </div>
-        <div class="rope-marker" id="rope-marker" style="left: 50%;">
-          <div class="flag-pole"></div>
-          <div class="flag-cloth"></div>
-          <div class="flag-knot"></div>
+        <div style="font-family:'Orbitron'; font-size:16px; color:#57606f;">VS</div>
+        <div>
+          <div class="team-label blue-label">綠隊 GREEN</div>
+          <div class="team-score blue-score" id="blue-score">0</div>
         </div>
       </div>
-      <div class="particles-layer" id="particles"></div>
+
+      <!-- 動態拔河大舞台 -->
+      <div class="tow-stage">
+        <div class="stage-floor"></div>
+
+        <!-- 隨比分移動的主車架 -->
+        <div class="rope-assembly" id="rope-assembly">
+          <div class="rope-line"></div>
+          <div class="center-flag">
+            <div class="flag-banner"></div>
+            <div class="flag-ring"></div>
+          </div>
+
+          <!-- 紅隊 4 位公仔 -->
+          <div class="team-sprites sprites-red">
+            <div class="character pulling-red"><svg viewBox="0 0 64 80"><circle cx="32" cy="18" r="14" fill="#ff6b81"/><path d="M16 36 Q32 32 48 36 L44 60 L20 60 Z" fill="#ff4757"/><circle cx="26" cy="16" r="2" fill="#fff"/><circle cx="36" cy="16" r="2" fill="#fff"/></svg></div>
+            <div class="character pulling-red"><svg viewBox="0 0 64 80"><circle cx="32" cy="18" r="14" fill="#ff6b81"/><path d="M16 36 Q32 32 48 36 L44 60 L20 60 Z" fill="#ff4757"/><circle cx="26" cy="16" r="2" fill="#fff"/><circle cx="36" cy="16" r="2" fill="#fff"/></svg></div>
+            <div class="character pulling-red"><svg viewBox="0 0 64 80"><circle cx="32" cy="18" r="14" fill="#ff6b81"/><path d="M16 36 Q32 32 48 36 L44 60 L20 60 Z" fill="#ff4757"/><circle cx="26" cy="16" r="2" fill="#fff"/><circle cx="36" cy="16" r="2" fill="#fff"/></svg></div>
+            <div class="character pulling-red"><svg viewBox="0 0 64 80"><circle cx="32" cy="18" r="14" fill="#ff6b81"/><path d="M16 36 Q32 32 48 36 L44 60 L20 60 Z" fill="#ff4757"/><circle cx="26" cy="16" r="2" fill="#fff"/><circle cx="36" cy="16" r="2" fill="#fff"/></svg></div>
+          </div>
+
+          <!-- 綠隊 4 位公仔 -->
+          <div class="team-sprites sprites-blue">
+            <div class="character pulling-blue"><svg viewBox="0 0 64 80"><circle cx="32" cy="18" r="14" fill="#7bed9f"/><path d="M16 36 Q32 32 48 36 L44 60 L20 60 Z" fill="#2ed573"/><circle cx="28" cy="16" r="2" fill="#fff"/><circle cx="38" cy="16" r="2" fill="#fff"/></svg></div>
+            <div class="character pulling-blue"><svg viewBox="0 0 64 80"><circle cx="32" cy="18" r="14" fill="#7bed9f"/><path d="M16 36 Q32 32 48 36 L44 60 L20 60 Z" fill="#2ed573"/><circle cx="28" cy="16" r="2" fill="#fff"/><circle cx="38" cy="16" r="2" fill="#fff"/></svg></div>
+            <div class="character pulling-blue"><svg viewBox="0 0 64 80"><circle cx="32" cy="18" r="14" fill="#7bed9f"/><path d="M16 36 Q32 32 48 36 L44 60 L20 60 Z" fill="#2ed573"/><circle cx="28" cy="16" r="2" fill="#fff"/><circle cx="38" cy="16" r="2" fill="#fff"/></svg></div>
+            <div class="character pulling-blue"><svg viewBox="0 0 64 80"><circle cx="32" cy="18" r="14" fill="#7bed9f"/><path d="M16 36 Q32 32 48 36 L44 60 L20 60 Z" fill="#2ed573"/><circle cx="28" cy="16" r="2" fill="#fff"/><circle cx="38" cy="16" r="2" fill="#fff"/></svg></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="diff-bar-wrap">
+        <div class="diff-bar">
+          <div class="diff-red-fill" id="diff-red" style="width:50%"></div>
+          <div class="diff-blue-fill" id="diff-blue" style="width:50%"></div>
+        </div>
+      </div>
+
+      <div class="game-status" id="game-status">點擊下方按鈕啟動 100 題對戰！</div>
+
+      <button class="btn-start" onclick="startGame()">🎲 重新載入 100 題新題目</button>
     </div>
 
-    <div class="diff-bar-wrap">
-      <div class="diff-bar">
-        <div class="diff-red-fill" id="diff-red" style="width:50%"></div>
-        <div class="diff-blue-fill" id="diff-blue" style="width:50%"></div>
-      </div>
-      <div class="diff-legend">
-        <span>紅隊優勢</span>
-        <span>藍隊優勢</span>
-      </div>
+    <!-- 選擇隊伍 -->
+    <div id="team-select-section" class="team-select">
+      <h3 style="margin-bottom:16px;">選擇你的陣營加入拉鋸戰：</h3>
+      <button class="btn-team btn-red" onclick="joinTeam('red')">加入紅隊</button>
+      <button class="btn-team btn-blue" onclick="joinTeam('blue')">加入綠隊</button>
     </div>
 
-    <div class="game-status" id="game-status">等待遊戲開始...</div>
-
-    <button class="btn-start" onclick="startGame()">🎲 重新載入 AI 題目 (Dify)</button>
-  </div>
-
-  <!-- 玩家選擇隊伍區 -->
-  <div id="team-select-section" class="team-select">
-    <h3>請選擇你的隊伍：</h3>
-    <button class="btn-team btn-red" onclick="joinTeam('red')">加入紅隊</button>
-    <button class="btn-team btn-blue" onclick="joinTeam('blue')">加入藍隊</button>
-  </div>
-
-  <!-- 個人答題區 -->
-  <div id="quiz-card" class="quiz-card">
-    <div id="question" class="question">等待發題...</div>
-    <div id="options-grid" class="options-grid"></div>
+    <!-- 答題卡 -->
+    <div id="quiz-card" class="quiz-card">
+      <div id="question" class="question">等待題目...</div>
+      <div id="options-grid" class="options-grid"></div>
+    </div>
   </div>
 
   <script>
@@ -401,26 +264,20 @@
     let questions = [];
     let currentQuestionIndex = 0;
     let questionStartTime = 0;
+    let lastRedScore = 0;
+    let lastBlueScore = 0;
 
-    // DOM refs
     const redScoreEl = document.getElementById('red-score');
     const blueScoreEl = document.getElementById('blue-score');
-    const ropeMarker = document.getElementById('rope-marker');
-    const ropeRed = document.getElementById('rope-red');
-    const ropeBlue = document.getElementById('rope-blue');
+    const ropeAssembly = document.getElementById('rope-assembly');
+    const arenaBox = document.getElementById('arena-box');
     const diffRed = document.getElementById('diff-red');
     const diffBlue = document.getElementById('diff-blue');
     const statusEl = document.getElementById('game-status');
-    const particlesLayer = document.getElementById('particles');
 
-    // 連線與狀態更新
-    socket.on('connect', () => {
-      console.log('連線至伺服器成功:', socket.id);
-    });
+    socket.on('connect', () => { console.log('已連線至伺服器'); });
 
-    socket.on('game_update', (state) => {
-      updateArena(state.redScore, state.blueScore);
-    });
+    socket.on('game_update', (state) => { updateArena(state.redScore, state.blueScore); });
 
     socket.on('game_init', (state) => {
       questions = state.questions;
@@ -430,79 +287,54 @@
     });
 
     socket.on('game_over', (data) => {
-      const winner = data.winner === 'red' ? '紅隊' : '藍隊';
-      statusEl.innerHTML = `<strong style="color:#f1c40f">🎉 遊戲結束！恭喜 ${winner} 獲得勝利！</strong>`;
-      confettiEffect(data.winner);
+      const winner = data.winner === 'red' ? '紅隊' : '綠隊';
+      statusEl.innerHTML = `<strong style="color:#f1c40f; font-size:18px;">🎉 最終勝利歸於 ${winner}！</strong>`;
     });
 
-    // 更新視覺區
     function updateArena(redScore, blueScore) {
+      // 觸發得分動畫與震動
+      if (redScore > lastRedScore) showFloatingText('red', `+${redScore - lastRedScore}`);
+      if (blueScore > lastBlueScore) showFloatingText('blue', `+${blueScore - lastBlueScore}`);
+      
+      if (redScore !== lastRedScore || blueScore !== lastBlueScore) {
+        arenaBox.classList.add('shake');
+        setTimeout(() => arenaBox.classList.remove('shake'), 250);
+      }
+
+      lastRedScore = redScore;
+      lastBlueScore = blueScore;
+
       redScoreEl.textContent = redScore;
       blueScoreEl.textContent = blueScore;
 
       const diff = redScore - blueScore;
       const total = redScore + blueScore || 1;
-      const maxDiff = Math.max(Math.abs(diff), 50);
-      const normalized = diff / maxDiff;
-      const position = 50 + normalized * 42;
-      const clamped = Math.max(5, Math.min(95, position));
+      
+      // 計算車架平移 position (30% ~ 70%)
+      const maxDiff = Math.max(Math.abs(diff), 60);
+      const shiftPercent = (diff / maxDiff) * 22; // 最大移動 22%
+      ropeAssembly.style.left = (50 + shiftPercent) + '%';
 
-      ropeMarker.style.left = clamped + '%';
-      ropeRed.style.right = (100 - clamped) + '%';
-      ropeBlue.style.left = clamped + '%';
-
-      const redW = total > 0 ? (redScore / total) * 100 : 50;
+      const redW = (redScore / total) * 100;
       diffRed.style.width = redW + '%';
       diffBlue.style.width = (100 - redW) + '%';
 
-      if (diff > 20) statusEl.innerHTML = `<strong style="color:#ff6b6b">紅隊大幅領先！</strong> 繩子偏向紅隊陣地 ${diff} 分`;
-      else if (diff < -20) statusEl.innerHTML = `<strong style="color:#4dabf7">藍隊大幅領先！</strong> 繩子偏向藍隊陣地 ${Math.abs(diff)} 分`;
-      else if (diff > 0) statusEl.innerHTML = `紅隊領先 ${diff} 分，繩子略偏紅隊`;
-      else if (diff < 0) statusEl.innerHTML = `藍隊領先 ${Math.abs(diff)} 分，繩子略偏藍隊`;
-      else statusEl.innerHTML = `雙方勢均力敵，繩子在中線`;
+      if (diff > 15) statusEl.innerHTML = `<strong style="color:#ff4757">紅隊正在強力拉扯！</strong> 領先 ${diff} 分`;
+      else if (diff < -15) statusEl.innerHTML = `<strong style="color:#2ed573">綠隊發動猛烈反撲！</strong> 領先 ${Math.abs(diff)} 分`;
+      else statusEl.innerHTML = `雙方緊繃拉鋸中！`;
     }
 
-    // 得分粒子特效
-    function spawnParticles(team) {
-      const color = team === 'red' ? '#ff6b6b' : '#4dabf7';
-      const centerX = team === 'red' ? 20 : 80;
-      for (let i = 0; i < 10; i++) {
-        const p = document.createElement('div');
-        p.className = 'particle';
-        p.style.background = color;
-        p.style.left = centerX + '%';
-        p.style.top = '50%';
-        const angle = (Math.random() * 140 - 70) * (Math.PI / 180);
-        const dist = 30 + Math.random() * 50;
-        p.style.setProperty('--tx', Math.sin(angle) * dist + 'px');
-        p.style.setProperty('--ty', Math.cos(angle) * dist + 'px');
-        p.style.animation = 'particleBurst 0.7s ease-out forwards';
-        particlesLayer.appendChild(p);
-        setTimeout(() => p.remove(), 700);
-      }
+    function showFloatingText(team, text) {
+      const el = document.createElement('div');
+      el.className = 'float-text';
+      el.innerText = text;
+      el.style.color = team === 'red' ? '#ff4757' : '#2ed573';
+      el.style.left = team === 'red' ? '35%' : '65%';
+      el.style.top = '40%';
+      document.querySelector('.tow-stage').appendChild(el);
+      setTimeout(() => el.remove(), 800);
     }
 
-    // 勝利彩紙特效
-    function confettiEffect(winner) {
-      const color = winner === 'red' ? '#ff6b6b' : '#4dabf7';
-      for (let i = 0; i < 30; i++) {
-        const p = document.createElement('div');
-        p.className = 'particle';
-        p.style.background = color;
-        p.style.left = '50%';
-        p.style.top = '50%';
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 40 + Math.random() * 80;
-        p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
-        p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
-        p.style.animation = 'particleBurst 1s ease-out forwards';
-        p.style.width = '6px'; p.style.height = '6px';
-        particlesLayer.appendChild(p);
-        setTimeout(() => p.remove(), 1000);
-      }
-    }
-
-    // 加入隊伍
     function joinTeam(team) {
       currentTeam = team;
       socket.emit('join_team', team);
@@ -511,17 +343,15 @@
       if (questions.length > 0) showNextQuestion();
     }
 
-    // 手動叫用後端 API 重置/發題目
     function startGame() {
-      fetch(`${RENDER_BACKEND_URL}/api/start-game?difficulty=easy&count=10`)
+      fetch(`${RENDER_BACKEND_URL}/api/start-game`)
         .then(res => res.json())
-        .then(data => console.log('遊戲已重置:', data));
+        .then(data => console.log('遊戲已重置'));
     }
 
-    // 顯示下一題
     function showNextQuestion() {
       if (currentQuestionIndex >= questions.length) {
-        document.getElementById('question').innerText = "題目已答完！等待下一局...";
+        document.getElementById('question').innerText = "100 題已全數完成！";
         document.getElementById('options-grid').innerHTML = "";
         return;
       }
@@ -540,20 +370,18 @@
       });
     }
 
-    // 提交答案
     function submitAnswer(selected, correct) {
       const isCorrect = (selected === correct);
       const responseTimeSec = (Date.now() - questionStartTime) / 1000;
       socket.emit('submit_answer', { isCorrect, responseTimeSec });
 
       if (isCorrect) {
-        spawnParticles(currentTeam);
         currentQuestionIndex++;
         showNextQuestion();
       } else {
         const quizCard = document.getElementById('quiz-card');
         quizCard.classList.add('frozen');
-        setTimeout(() => quizCard.classList.remove('frozen'), 1500);
+        setTimeout(() => quizCard.classList.remove('frozen'), 1200);
       }
     }
   </script>
