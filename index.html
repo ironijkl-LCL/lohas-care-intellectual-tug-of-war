@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智力拉鋸戰 - 30秒等候搶答版</title>
+  <title>智力拉鋸戰 - 全場即時搶答版</title>
   <!-- Socket.io Client -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <!-- Google Fonts 霓虹科技感字體 -->
@@ -100,6 +100,7 @@
     @keyframes pulseFlag { from { transform: scale(1); } to { transform: scale(1.15); } }
     .flag-ring { width: 14px; height: 14px; background: #f1c40f; border-radius: 50%; border: 2px solid #fff; margin-top: -4px; }
 
+    /* ===== 公仔團隊 ===== */
     .team-sprites { position: absolute; top: 25px; display: flex; gap: 6px; z-index: 3; }
     .sprites-red { right: 52%; flex-direction: row-reverse; }
     .sprites-blue { left: 52%; flex-direction: row; }
@@ -114,7 +115,7 @@
     }
     @keyframes pullBlue {
       from { transform: rotate(8deg) translateX(0); }
-      to { transform: rotate(18deg) translateX(4px); }
+      to { transform: rotate(18deg) translateX(-4px); }
     }
 
     .float-text {
@@ -149,14 +150,14 @@
     .btn-red { background: linear-gradient(135deg, #ff4757, #ff6b81); box-shadow: 0 6px 20px rgba(255, 71, 87, 0.4); }
     .btn-blue { background: linear-gradient(135deg, #2ed573, #10ac84); box-shadow: 0 6px 20px rgba(46, 213, 115, 0.4); }
 
-    /* ===== NEW: 等候區 (Lobby) 樣式 ===== */
+    /* ===== 等候區 (Lobby) ===== */
     .lobby-section {
       background: rgba(15, 20, 35, 0.95); backdrop-filter: blur(20px); border-radius: 20px;
       padding: 24px 20px; margin: 16px auto; max-width: 480px; display: none;
       border: 1px solid rgba(0, 210, 255, 0.3); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
     }
     .lobby-countdown-ring {
-      font-family: 'Orbitron', sans-serif; font-size: 42px; font-weight: 900; color: #f1c40f;
+      font-family: 'Orbitron', sans-serif; font-size: 46px; font-weight: 900; color: #f1c40f;
       text-shadow: 0 0 15px rgba(241, 196, 15, 0.8); margin: 10px 0;
     }
     .team-counts {
@@ -166,7 +167,7 @@
       background: rgba(255, 255, 255, 0.05); padding: 12px 20px; border-radius: 12px; min-width: 130px;
     }
 
-    /* 答題卡與搶答提示 */
+    /* ===== 答題卡區 ===== */
     .quiz-card {
       background: rgba(15, 20, 35, 0.9); backdrop-filter: blur(20px); border-radius: 20px;
       padding: 24px 20px; margin: 16px auto; max-width: 440px; display: none;
@@ -277,7 +278,7 @@
       <button class="btn-team btn-blue" onclick="joinTeam('blue')">加入綠隊</button>
     </div>
 
-    <!-- NEW: 等候區 (Lobby) -->
+    <!-- 等候區 (Lobby) -->
     <div id="lobby-section" class="lobby-section">
       <h3 style="color:#00d2ff; font-family:'Orbitron'; margin-bottom:8px;">⌛ 備戰等候區</h3>
       <p style="font-size:13px; color:#a4b0be;">遊戲即將開始，請準備好搶答手速！</p>
@@ -287,18 +288,17 @@
       <div class="team-counts">
         <div class="team-box">
           <div style="color:#ff4757; font-weight:900;">紅隊人數</div>
-          <div id="red-count" style="font-size:22px; font-weight:900;">0</div>
+          <div id="red-count" style="font-size:22px; font-weight:900;">1</div>
         </div>
         <div class="team-box">
           <div style="color:#2ed573; font-weight:900;">綠隊人數</div>
-          <div id="blue-count" style="font-size:22px; font-weight:900;">0</div>
+          <div id="blue-count" style="font-size:22px; font-weight:900;">1</div>
         </div>
       </div>
     </div>
 
     <!-- 答題卡區 -->
     <div id="quiz-card" class="quiz-card">
-      <!-- 搶答被奪取/成功遮罩 Banner -->
       <div id="stolen-banner" class="stolen-banner">
         <div id="stolen-title" class="stolen-title">⚡ 太慢了！</div>
         <div id="stolen-sub" class="stolen-sub">題目已被對手搶先答對！</div>
@@ -308,7 +308,7 @@
         <div id="q-number" class="q-number">QUESTION 01</div>
       </div>
 
-      <!-- 倒數計時器 -->
+      <!-- 答題計時器 -->
       <div id="timer-container" class="timer-container">
         <div id="timer-text" class="timer-text">15.0s</div>
         <div class="timer-bar">
@@ -378,6 +378,7 @@
     const QUESTION_TIMEOUT_SEC = 15;
     let timerInterval = null;
     let timeLeft = QUESTION_TIMEOUT_SEC;
+    let lobbyLocalTimer = null;
 
     const redScoreEl = document.getElementById('red-score');
     const blueScoreEl = document.getElementById('blue-score');
@@ -401,31 +402,19 @@
     const timerTextEl = document.getElementById('timer-text');
     const timerFillEl = document.getElementById('timer-fill');
 
-    socket.on('connect', () => { console.log('已連線至伺服器'); });
+    socket.on('connect', () => { console.log('已成功連線至後端伺服器'); });
 
-    // NEW: 接收等候區廣播狀態 (倒數 30 秒與兩隊人數)
+    // 接收來自後端的隊伍人數同步
     socket.on('lobby_update', (data) => {
-      // data: { countdown: 30, redCount: 1, blueCount: 2, isWaiting: true }
-      if (data.isWaiting) {
-        lobbyCountdownEl.innerText = data.countdown;
-        redCountEl.innerText = data.redCount;
-        blueCountEl.innerText = data.blueCount;
-        
-        if (currentTeam) {
-          lobbySection.style.display = 'block';
-          quizCard.style.display = 'none';
-        }
+      if (data) {
+        if (data.redCount !== undefined) redCountEl.innerText = data.redCount;
+        if (data.blueCount !== undefined) blueCountEl.innerText = data.blueCount;
       }
     });
 
-    // NEW: 倒數結束，正式開戰廣播
+    // 伺服器廣播開戰
     socket.on('battle_start', () => {
-      playSound('start_game');
-      lobbySection.style.display = 'none';
-      if (currentTeam) {
-        quizCard.style.display = 'block';
-      }
-      statusEl.innerHTML = `<strong style="color:#f1c40f">🔥 30秒備戰結束！戰區開打！</strong>`;
+      enterBattleZone();
     });
 
     socket.on('game_update', (state) => {
@@ -449,6 +438,42 @@
       const winner = data.winner === 'red' ? '紅隊' : '綠隊';
       statusEl.innerHTML = `<strong style="color:#f1c40f; font-size:18px;">🎉 最終勝利歸於 ${winner}！</strong>`;
     });
+
+    // 選擇隊伍並進入 30 秒等候倒數
+    function joinTeam(team) {
+      currentTeam = team;
+      socket.emit('join_team', team);
+      
+      document.getElementById('team-select-section').style.display = 'none';
+      lobbySection.style.display = 'block';
+
+      // 前端啟動自主 30 秒平滑倒數
+      let count = 30;
+      lobbyCountdownEl.innerText = count;
+
+      if (lobbyLocalTimer) clearInterval(lobbyLocalTimer);
+      
+      lobbyLocalTimer = setInterval(() => {
+        count--;
+        lobbyCountdownEl.innerText = count;
+
+        if (count <= 0) {
+          clearInterval(lobbyLocalTimer);
+          enterBattleZone();
+        }
+      }, 1000);
+    }
+
+    // 正式切換進入戰區
+    function enterBattleZone() {
+      if (lobbyLocalTimer) clearInterval(lobbyLocalTimer);
+      playSound('start_game');
+      lobbySection.style.display = 'none';
+      if (currentTeam) {
+        quizCard.style.display = 'block';
+      }
+      statusEl.innerHTML = `<strong style="color:#f1c40f">🔥 備戰結束！開打搶答！</strong>`;
+    }
 
     function renderQuestion(data) {
       currentQuestionData = data;
@@ -525,13 +550,6 @@
       el.style.top = '40%';
       document.querySelector('.tow-stage').appendChild(el);
       setTimeout(() => el.remove(), 800);
-    }
-
-    function joinTeam(team) {
-      currentTeam = team;
-      socket.emit('join_team', team);
-      document.getElementById('team-select-section').style.display = 'none';
-      lobbySection.style.display = 'block';
     }
 
     function startGame() {
