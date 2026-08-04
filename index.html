@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智力拉鋸戰 - 全場即時搶答版</title>
+  <title>智力拉鋸戰 - 即時人數搶答版</title>
   <!-- Socket.io Client -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <!-- Google Fonts 霓虹科技感字體 -->
@@ -404,17 +404,12 @@
 
     socket.on('connect', () => { console.log('已成功連線至後端伺服器'); });
 
-    // 接收來自後端的真實隊伍人數同步
+    // 即時接收伺服器廣播的兩隊在線人數
     socket.on('lobby_update', (data) => {
       if (data) {
         if (data.redCount !== undefined) redCountEl.innerText = data.redCount;
         if (data.blueCount !== undefined) blueCountEl.innerText = data.blueCount;
       }
-    });
-
-    // 伺服器廣播開戰
-    socket.on('battle_start', () => {
-      enterBattleZone();
     });
 
     socket.on('game_update', (state) => {
