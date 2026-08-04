@@ -3,7 +3,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -13,71 +12,91 @@ app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
-// 本地高速預設題庫 (避免等待 Dify API 響應)
-const DEFAULT_QUESTIONS = [
-  { id: 1, question: "7 x 8", options: ["56", "48", "64", "52"], answer: "56" },
-  { id: 2, question: "28 - 17", options: ["11", "9", "12", "14"], answer: "11" },
-  { id: 3, question: "15 + 29", options: ["44", "42", "34", "54"], answer: "44" },
-  { id: 4, question: "81 ÷ 9", options: ["9", "8", "7", "6"], answer: "9" },
-  { id: 5, question: "12 x 4", options: ["48", "44", "52", "36"], answer: "48" },
-  { id: 6, question: "63 - 28", options: ["35", "37", "45", "25"], answer: "35" },
-  { id: 7, question: "9 x 6", options: ["54", "48", "56", "62"], answer: "54" },
-  { id: 8, question: "100 - 43", options: ["57", "67", "53", "47"], answer: "57" }
-];
+// 🎲 演算法自動生成 100 題心算題目（加、減、乘、除）
+function generate100Questions() {
+  const questions = [];
+  const operators = ['+', '-', '*', '/'];
+
+  for (let i = 1; i <= 100; i++) {
+    const op = operators[Math.floor(Math.random() * operators.length)];
+    let num1, num2, answer, qText;
+
+    switch (op) {
+      case '+':
+        num1 = Math.floor(Math.random() * 50) + 10;
+        num2 = Math.floor(Math.random() * 50) + 10;
+        answer = num1 + num2;
+        qText = `${num1} + ${num2}`;
+        break;
+      case '-':
+        num1 = Math.floor(Math.random() * 80) + 20;
+        num2 = Math.floor(Math.random() * num1) + 1; // 確保結果為正數
+        answer = num1 - num2;
+        qText = `${num1} - ${num2}`;
+        break;
+      case '*':
+        num1 = Math.floor(Math.random() * 12) + 2;
+        num2 = Math.floor(Math.random() * 12) + 2;
+        answer = num1 * num2;
+        qText = `${num1} × ${num2}`;
+        break;
+      case '/':
+        num2 = Math.floor(Math.random() * 9) + 2;
+        answer = Math.floor(Math.random() * 10) + 2;
+        num1 = num2 * answer; // 確保整除
+        qText = `${num1} ÷ ${num2}`;
+        break;
+    }
+
+    // 自動產生 3 個干擾項答案
+    const options = new Set([String(answer)]);
+    while (options.size < 4) {
+      const offset = (Math.floor(Math.random() * 5) + 1) * (Math.random() < 0.5 ? 1 : -1);
+      const wrongAns = answer + offset;
+      if (wrongAns >= 0) options.add(String(wrongAns));
+    }
+
+    questions.push({
+      id: i,
+      question: qText,
+      options: Array.from(options).sort(() => Math.random() - 0.5),
+      answer: String(answer)
+    });
+  }
+
+  return questions;
+}
 
 let gameState = {
   redScore: 0,
   blueScore: 0,
   ropePosition: 50,
   targetDiff: 200,
-  questions: DEFAULT_QUESTIONS
+  questions: generate100Questions()
 };
 
-// 異步向 Dify 抓取題目
-async function fetchDifyQuestions(difficulty = 'easy', count = 10) {
-  const difyApiKey = process.env.DIFY_API_KEY;
-  if (!difyApiKey) return null;
-
-  try {
-    const response = await axios.post(
-      'https://api.dify.ai/v1/workflows/run',
-      { inputs: { difficulty, count }, response_mode: 'blocking', user: 'game-server' },
-      { headers: { 'Authorization': `Bearer ${difyApiKey}`, 'Content-Type': 'application/json' }, timeout: 5000 }
-    );
-    const resultText = response.data?.data?.outputs?.result || response.data?.data?.outputs?.text;
-    return JSON.parse(resultText);
-  } catch (error) {
-    console.warn('⚠️ Dify API 逾時或失敗，繼續使用快取題庫');
-    return null;
-  }
-}
-
-// REST API：先秒回本地題目，背景再向 Dify 抓新題目
-app.get('/api/start-game', async (req, res) => {
+// 重置並重新生成 100 題
+app.get('/api/start-game', (req, res) => {
   gameState.redScore = 0;
   gameState.blueScore = 0;
   gameState.ropePosition = 50;
+  gameState.questions = generate100Questions(); // 每次點擊重新生成全新的 100 題
 
-  // 1. 先用快取題目（打亂順序），達到 0 秒延遲
-  gameState.questions = [...DEFAULT_QUESTIONS].sort(() => Math.random() - 0.5);
   io.emit('game_init', gameState);
-  res.json({ success: true, message: "遊戲已秒速重置", gameState });
-
-  // 2. 背景異步向 Dify 抓取新 AI 題目（抓到後自動悄悄更新）
-  const newQuestions = await fetchDifyQuestions();
-  if (newQuestions && Array.isArray(newQuestions)) {
-    gameState.questions = newQuestions;
-    console.log('✅ Dify AI 新題目已背景載入完成');
-  }
+  res.json({ success: true, message: "遊戲已重置，已載入全新 100 題！", totalQuestions: gameState.questions.length });
 });
 
 io.on('connection', (socket) => {
   socket.emit('game_update', gameState);
 
-  socket.on('join_team', (team) => { socket.team = team; });
+  socket.on('join_team', (team) => {
+    socket.team = team;
+  });
 
   socket.on('submit_answer', ({ isCorrect, responseTimeSec }) => {
     if (!isCorrect || !socket.team) return;
+
+    // 速度加分機制
     const speedBonus = Math.max(0, Math.floor((1.5 - responseTimeSec) * 10));
     const points = 10 + speedBonus;
 
@@ -89,6 +108,7 @@ io.on('connection', (socket) => {
 
     io.emit('game_update', gameState);
 
+    // 勝負判定（拉鋸到兩端）
     if (gameState.ropePosition >= 100) io.emit('game_over', { winner: 'red' });
     else if (gameState.ropePosition <= 0) io.emit('game_over', { winner: 'blue' });
   });
