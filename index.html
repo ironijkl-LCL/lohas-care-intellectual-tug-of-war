@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智力拉鋸戰 - Arcade Master Edition</title>
+  <title>智力拉鋸戰 - Fever Arcade Edition</title>
   <!-- Socket.io Client -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <!-- Google Fonts 霓虹科技感字體 -->
@@ -16,6 +16,7 @@
     body {
       background: radial-gradient(circle at 50% 20%, #1a1c38 0%, #0d0e1e 60%, #05050d 100%);
       color: #fff; text-align: center; padding: 16px 12px; min-height: 100vh; overflow-x: hidden; position: relative;
+      transition: background 0.5s;
     }
 
     body::before {
@@ -23,6 +24,20 @@
       background: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
                   linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
       background-size: 32px 32px; pointer-events: none; z-index: 0;
+    }
+
+    /* ===== FEVER 全螢幕狂暴視覺特效 ===== */
+    body.is-fever {
+      background: radial-gradient(circle at 50% 20%, #3a1c0d 0%, #1e0e05 60%, #0d0502 100%);
+    }
+    body.is-fever::after {
+      content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      box-shadow: inset 0 0 50px #f1c40f, inset 0 0 100px #e67e22;
+      pointer-events: none; z-index: 99; animation: feverBorderPulse 0.5s infinite alternate;
+    }
+    @keyframes feverBorderPulse {
+      from { opacity: 0.6; }
+      to { opacity: 1; }
     }
 
     .container { position: relative; z-index: 1; max-width: 820px; margin: 0 auto; }
@@ -123,8 +138,11 @@
       to { transform: rotate(18deg) translateX(4px); }
     }
 
-    /* Fever 狂暴狀態 */
-    .fever-mode .character { filter: drop-shadow(0 0 10px #f1c40f); animation-duration: 0.2s !important; }
+    /* FEVER 狂暴狀態：小人仔高速拉扯 + 金光發亮 */
+    body.is-fever .character {
+      filter: drop-shadow(0 0 12px #f1c40f);
+      animation-duration: 0.18s !important;
+    }
 
     /* 浮動傷害/得分文字 */
     .float-text {
@@ -167,10 +185,31 @@
       background: rgba(15, 20, 35, 0.9); backdrop-filter: blur(20px); border-radius: 20px;
       padding: 24px 20px; margin: 16px auto; max-width: 440px; display: none;
       border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
-      position: relative; overflow: hidden;
+      position: relative; overflow: hidden; transition: all 0.3s;
+    }
+
+    /* FEVER 卡片樣式 */
+    .quiz-card.fever-card {
+      border: 2px solid #f1c40f;
+      box-shadow: 0 0 30px rgba(241, 196, 15, 0.6), inset 0 0 15px rgba(241, 196, 15, 0.3);
+      animation: feverCardGlow 1s infinite alternate;
+    }
+    @keyframes feverCardGlow {
+      from { transform: scale(1); }
+      to { transform: scale(1.02); }
+    }
+
+    /* FEVER 倒數條 */
+    .fever-timer-wrap {
+      display: none; height: 6px; background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px; overflow: hidden; margin-bottom: 12px;
+    }
+    .fever-timer-fill {
+      height: 100%; width: 100%;
+      background: linear-gradient(90deg, #f1c40f, #e67e22, #ff4757);
     }
     
-    /* ===== NEW: 計時器進度條樣式 ===== */
+    /* 計時器進度條樣式 */
     .timer-container {
       display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
     }
@@ -187,13 +226,9 @@
       background: linear-gradient(90deg, #00d2ff, #00b894);
       transition: width 0.1s linear, background 0.3s;
     }
-    /* 緊急倒數 (少於 3 秒) 的閃爍樣式 */
-    .timer-warning .timer-fill {
-      background: linear-gradient(90deg, #ff4757, #ff6b81);
-    }
-    .timer-warning .timer-text {
-      color: #ff4757; animation: blinkText 0.5s infinite alternate;
-    }
+    /* 緊急倒數 (少於 3 秒) */
+    .timer-warning .timer-fill { background: linear-gradient(90deg, #ff4757, #ff6b81); }
+    .timer-warning .timer-text { color: #ff4757; animation: blinkText 0.5s infinite alternate; }
     @keyframes blinkText { from { opacity: 1; } to { opacity: 0.3; } }
 
     /* Combo 指示標籤 */
@@ -203,6 +238,15 @@
       padding: 4px 12px; border-radius: 12px; box-shadow: 0 0 10px rgba(241, 196, 15, 0.8);
       display: none; z-index: 5;
     }
+
+    /* FEVER 模式標籤 */
+    .fever-badge {
+      position: absolute; top: 12px; left: 20px; background: linear-gradient(135deg, #e74c3c, #f1c40f);
+      color: #fff; font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 900;
+      padding: 4px 12px; border-radius: 12px; box-shadow: 0 0 15px rgba(231, 76, 60, 0.9);
+      display: none; z-index: 5; animation: pulseFever 0.4s infinite alternate;
+    }
+    @keyframes pulseFever { from { transform: scale(1); } to { transform: scale(1.1); } }
 
     .question { font-family: 'Orbitron', 'Noto Sans TC', sans-serif; font-size: 32px; font-weight: 900; margin-bottom: 20px; color: #00d2ff; }
     .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -286,8 +330,14 @@
     <!-- 答題卡區 -->
     <div id="quiz-card" class="quiz-card">
       <div id="combo-badge" class="combo-badge">COMBO x<span id="combo-count">0</span></div>
+      <div id="fever-badge" class="fever-badge">🔥 FEVER 2X</div>
+
+      <!-- FEVER 時間倒數條 -->
+      <div id="fever-timer-wrap" class="fever-timer-wrap">
+        <div id="fever-timer-fill" class="fever-timer-fill"></div>
+      </div>
       
-      <!-- NEW: 倒數計時器元件 -->
+      <!-- 倒數計時器元件 -->
       <div id="timer-container" class="timer-container">
         <div id="timer-text" class="timer-text">15.0s</div>
         <div class="timer-bar">
@@ -318,6 +368,22 @@
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
         osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+      } else if (type === 'fever_correct') {
+        // NEW: Fever 狂暴連擊強音
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime); // E5
+        osc.frequency.exponentialRampToValueAtTime(1318.51, audioCtx.currentTime + 0.2); // E6
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+      } else if (type === 'fever_start') {
+        // NEW: 觸發 Fever 音效
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.35);
       } else if (type === 'wrong') {
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(180, audioCtx.currentTime);
@@ -326,7 +392,6 @@
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
         osc.start(); osc.stop(audioCtx.currentTime + 0.2);
       } else if (type === 'warning') {
-        // NEW: 倒數警告音
         osc.type = 'square';
         osc.frequency.setValueAtTime(440, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
@@ -343,10 +408,16 @@
     let lastBlueScore = 0;
     let comboCount = 0;
 
-    // NEW: 計時器全域變數
+    // 計時器變數
     const QUESTION_TIMEOUT_SEC = 15;
     let timerInterval = null;
     let timeLeft = QUESTION_TIMEOUT_SEC;
+
+    // FEVER 狂暴模式狀態變數
+    let isFeverMode = false;
+    let feverTimer = null;
+    const FEVER_DURATION_SEC = 8;
+    let feverTimeLeft = FEVER_DURATION_SEC;
 
     const redScoreEl = document.getElementById('red-score');
     const blueScoreEl = document.getElementById('blue-score');
@@ -357,8 +428,11 @@
     const statusEl = document.getElementById('game-status');
     const comboBadge = document.getElementById('combo-badge');
     const comboCountEl = document.getElementById('combo-count');
+    const quizCard = document.getElementById('quiz-card');
+    const feverBadge = document.getElementById('fever-badge');
+    const feverTimerWrap = document.getElementById('fever-timer-wrap');
+    const feverTimerFill = document.getElementById('fever-timer-fill');
 
-    // NEW: 計時器 DOM 元素
     const timerContainer = document.getElementById('timer-container');
     const timerTextEl = document.getElementById('timer-text');
     const timerFillEl = document.getElementById('timer-fill');
@@ -371,6 +445,7 @@
       questions = state.questions;
       currentQuestionIndex = 0;
       comboCount = 0;
+      exitFeverMode();
       updateComboUI();
       updateArena(state.redScore, state.blueScore);
       if (currentTeam) showNextQuestion();
@@ -378,6 +453,7 @@
 
     socket.on('game_over', (data) => {
       stopTimer();
+      exitFeverMode();
       const winner = data.winner === 'red' ? '紅隊' : '綠隊';
       statusEl.innerHTML = `<strong style="color:#f1c40f; font-size:18px;">🎉 最終勝利歸於 ${winner}！</strong>`;
     });
@@ -416,8 +492,9 @@
     function showFloatingText(team, text) {
       const el = document.createElement('div');
       el.className = 'float-text';
-      el.innerText = text;
+      el.innerText = isFeverMode ? `${text} 🔥` : text;
       el.style.color = team === 'red' ? '#ff4757' : '#2ed573';
+      if (isFeverMode) el.style.color = '#f1c40f'; // Fever 狀態字體變金色
       el.style.left = team === 'red' ? '35%' : '65%';
       el.style.top = '40%';
       document.querySelector('.tow-stage').appendChild(el);
@@ -428,7 +505,7 @@
       currentTeam = team;
       socket.emit('join_team', team);
       document.getElementById('team-select-section').style.display = 'none';
-      document.getElementById('quiz-card').style.display = 'block';
+      quizCard.style.display = 'block';
       if (questions.length > 0) showNextQuestion();
     }
 
@@ -439,7 +516,7 @@
     }
 
     function updateComboUI() {
-      if (comboCount >= 2) {
+      if (comboCount >= 2 && !isFeverMode) {
         comboBadge.style.display = 'block';
         comboCountEl.innerText = comboCount;
       } else {
@@ -447,7 +524,41 @@
       }
     }
 
-    // NEW: 啟動倒數計時器
+    // NEW: 觸發 FEVER 狂暴模式
+    function triggerFeverMode() {
+      isFeverMode = true;
+      playSound('fever_start');
+      document.body.classList.add('is-fever');
+      quizCard.classList.add('fever-card');
+      feverBadge.style.display = 'block';
+      feverTimerWrap.style.display = 'block';
+      comboBadge.style.display = 'none';
+
+      feverTimeLeft = FEVER_DURATION_SEC;
+      if (feverTimer) clearInterval(feverTimer);
+
+      feverTimer = setInterval(() => {
+        feverTimeLeft -= 0.1;
+        const fillPercent = (feverTimeLeft / FEVER_DURATION_SEC) * 100;
+        feverTimerFill.style.width = `${Math.max(0, fillPercent)}%`;
+
+        if (feverTimeLeft <= 0) {
+          exitFeverMode();
+        }
+      }, 100);
+    }
+
+    // NEW: 結束 FEVER 狂暴模式
+    function exitFeverMode() {
+      isFeverMode = false;
+      if (feverTimer) clearInterval(feverTimer);
+      document.body.classList.remove('is-fever');
+      quizCard.classList.remove('fever-card');
+      feverBadge.style.display = 'none';
+      feverTimerWrap.style.display = 'none';
+      updateComboUI();
+    }
+
     function startTimer() {
       stopTimer();
       timeLeft = QUESTION_TIMEOUT_SEC;
@@ -458,28 +569,23 @@
 
       timerInterval = setInterval(() => {
         timeLeft -= 0.1;
-
-        // 當秒數跳變且小於等於 3 秒時，播放警示音
         const currentSec = Math.ceil(timeLeft);
         if (currentSec <= 3 && currentSec !== lastSec && currentSec > 0) {
           playSound('warning');
           lastSec = currentSec;
         }
 
-        if (timeLeft <= 3) {
-          timerContainer.classList.add('timer-warning');
-        }
+        if (timeLeft <= 3) timerContainer.classList.add('timer-warning');
 
         if (timeLeft <= 0) {
           stopTimer();
-          handleTimeout(); // 時間到處理
+          handleTimeout();
         } else {
           updateTimerUI();
         }
       }, 100);
     }
 
-    // NEW: 停止計時器
     function stopTimer() {
       if (timerInterval) {
         clearInterval(timerInterval);
@@ -487,7 +593,6 @@
       }
     }
 
-    // NEW: 更新計時器 UI (數字與進度條)
     function updateTimerUI() {
       const displaySec = Math.max(0, timeLeft).toFixed(1);
       timerTextEl.innerText = `${displaySec}s`;
@@ -495,14 +600,14 @@
       timerFillEl.style.width = `${fillPercent}%`;
     }
 
-    // NEW: 超時自動判定答錯處理
     function handleTimeout() {
-      submitAnswer(null, null, true); // 第三個參數 isTimeout = true
+      submitAnswer(null, null, true);
     }
 
     function showNextQuestion() {
       if (currentQuestionIndex >= questions.length) {
         stopTimer();
+        exitFeverMode();
         document.getElementById('question').innerText = "100 題已全數完成！";
         document.getElementById('options-grid').innerHTML = "";
         timerContainer.style.display = 'none';
@@ -523,33 +628,46 @@
         optionsGrid.appendChild(btn);
       });
 
-      // 每題啟動 15 秒計時
       startTimer();
     }
 
     function submitAnswer(selected, correct, isTimeout = false) {
-      stopTimer(); // 玩家回答或超時均先停掉計時器
+      stopTimer();
 
       const isCorrect = !isTimeout && (selected === correct);
       const responseTimeSec = (Date.now() - questionStartTime) / 1000;
       
-      socket.emit('submit_answer', { isCorrect, responseTimeSec });
+      // 若在 Fever Mode 中答對，傳送特別加權回傳後端（若後端支援）
+      socket.emit('submit_answer', { 
+        isCorrect, 
+        responseTimeSec,
+        isFever: isFeverMode 
+      });
 
       if (isCorrect) {
-        playSound('correct');
         comboCount++;
+
+        // 連續答對 3 題觸發 Fever Mode
+        if (comboCount >= 3 && !isFeverMode) {
+          triggerFeverMode();
+        } else if (isFeverMode) {
+          playSound('fever_correct');
+          feverTimeLeft = FEVER_DURATION_SEC; // 狂暴期間答對重置 Fever 時間！
+        } else {
+          playSound('correct');
+        }
+
         updateComboUI();
         currentQuestionIndex++;
         showNextQuestion();
       } else {
         playSound('wrong');
         comboCount = 0;
+        exitFeverMode(); // 答錯或超時即中斷 Fever 狂暴模式
         updateComboUI();
 
-        const quizCard = document.getElementById('quiz-card');
         quizCard.classList.add('frozen');
 
-        // 懲罰凍結 1.5 秒後自動跳下一題（若是超時也會自動跳題）
         setTimeout(() => {
           quizCard.classList.remove('frozen');
           currentQuestionIndex++;
