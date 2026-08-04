@@ -288,11 +288,11 @@
       <div class="team-counts">
         <div class="team-box">
           <div style="color:#ff4757; font-weight:900;">紅隊人數</div>
-          <div id="red-count" style="font-size:22px; font-weight:900;">1</div>
+          <div id="red-count" style="font-size:22px; font-weight:900;">0</div>
         </div>
         <div class="team-box">
           <div style="color:#2ed573; font-weight:900;">綠隊人數</div>
-          <div id="blue-count" style="font-size:22px; font-weight:900;">1</div>
+          <div id="blue-count" style="font-size:22px; font-weight:900;">0</div>
         </div>
       </div>
     </div>
@@ -325,7 +325,7 @@
     const RENDER_BACKEND_URL = 'https://lohas-care-intellectual-tug-of-war.onrender.com';
     const socket = io(RENDER_BACKEND_URL);
 
-    // 音效 Web Audio API
+    // Web Audio API 音效
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -404,7 +404,7 @@
 
     socket.on('connect', () => { console.log('已成功連線至後端伺服器'); });
 
-    // 接收來自後端的隊伍人數同步
+    // 接收來自後端的真實隊伍人數同步
     socket.on('lobby_update', (data) => {
       if (data) {
         if (data.redCount !== undefined) redCountEl.innerText = data.redCount;
@@ -447,7 +447,7 @@
       document.getElementById('team-select-section').style.display = 'none';
       lobbySection.style.display = 'block';
 
-      // 前端啟動自主 30 秒平滑倒數
+      // 啟動 30 秒平滑倒數
       let count = 30;
       lobbyCountdownEl.innerText = count;
 
@@ -464,7 +464,7 @@
       }, 1000);
     }
 
-    // 正式切換進入戰區
+    // 切換進入戰區
     function enterBattleZone() {
       if (lobbyLocalTimer) clearInterval(lobbyLocalTimer);
       playSound('start_game');
