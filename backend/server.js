@@ -1,3 +1,4 @@
+// === 在 server.js 頂部聲明等候區變數 ===
 let lobbyCountdown = 30;
 let lobbyTimer = null;
 let isGameStarted = false;
@@ -12,7 +13,7 @@ function startLobbyCountdown() {
   lobbyTimer = setInterval(() => {
     lobbyCountdown--;
     
-    // 廣播給所有玩家等候區倒數與隊伍人數
+    // 廣播給所有玩家等候區殘餘秒數與隊伍人數
     io.emit('lobby_update', {
       countdown: lobbyCountdown,
       redCount: players.red,
@@ -32,18 +33,37 @@ function startLobbyCountdown() {
   }, 1000);
 }
 
+// === 在 io.on('connection') 內部處理加入隊伍 ===
 io.on('connection', (socket) => {
+  // ... 其他程式碼 ...
+
   socket.on('join_team', (team) => {
     socket.team = team;
     if (team === 'red') players.red++;
     if (team === 'blue') players.blue++;
 
-    // 只要有第一個玩家加入，立刻觸發 30 秒等候區倒數！
+    console.log(`[Lobby] 玩家加入 ${team} 隊，目前人數 Red:${players.red}, Blue:${players.blue}`);
+
+    // 一有玩家加入，立刻觸發倒數並廣播一次當前狀態
     startLobbyCountdown();
+    
+    io.emit('lobby_update', {
+      countdown: lobbyCountdown,
+      redCount: players.red,
+      blueCount: players.blue,
+      isWaiting: !isGameStarted
+    });
   });
 
   socket.on('disconnect', () => {
     if (socket.team === 'red') players.red = Math.max(0, players.red - 1);
     if (socket.team === 'blue') players.blue = Math.max(0, players.blue - 1);
+    
+    io.emit('lobby_update', {
+      countdown: lobbyCountdown,
+      redCount: players.red,
+      blueCount: players.blue,
+      isWaiting: !isGameStarted
+    });
   });
 });
